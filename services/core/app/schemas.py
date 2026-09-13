@@ -58,13 +58,29 @@ class TaskOut(TaskCreate, ORMModel):
 
 class FocusStart(BaseModel):
     planned_minutes: int = Field(default=25, ge=1, le=180)
+    schedule_id: uuid.UUID | None = None
 
 
 class FocusOut(ORMModel):
     id: uuid.UUID
+    schedule_id: uuid.UUID | None
     planned_minutes: int
     started_at: datetime
     finished_at: datetime | None
+    end_reason: str | None
+
+
+class FocusStatusOut(FocusOut):
+    status: str
+    elapsed_seconds: int
+    remaining_seconds: int
+
+
+class NoiseTrackOut(BaseModel):
+    id: str
+    title: str
+    kind: str
+    url: str
 
 
 class BalanceOut(BaseModel):
