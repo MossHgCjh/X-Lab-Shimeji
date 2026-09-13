@@ -78,3 +78,56 @@ class RewardLedger(Base):
     reference_id: Mapped[str] = mapped_column(String(255))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
 
+
+# ──────────────── Schedule (日程) Models ────────────────
+
+
+class ScheduleFolder(Base):
+    """自定义日程文件夹，一个日程只能属于一个文件夹。"""
+    __tablename__ = "schedule_folders"
+    __table_args__ = (UniqueConstraint("user_id", "name"),)
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    name: Mapped[str] = mapped_column(String(100))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+
+
+class Schedule(Base):
+    """日程：包含起止时间、标题、简介等，归属于一个文件夹。"""
+    __tablename__ = "schedules"
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    folder_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("schedule_folders.id", ondelete="SET NULL"), index=True, nullable=True
+    )
+    title: Mapped[str] = mapped_column(String(200))
+    description: Mapped[str | None] = mapped_column(Text)
+    starts_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    ends_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    is_completed: Mapped[bool] = mapped_column(default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+
+
+class ScheduleTag(Base):
+    """日程标签，用户自定义标签名称。"""
+    __tablename__ = "schedule_tags"
+    __table_args__ = (UniqueConstraint("user_id", "name"),)
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    name: Mapped[str] = mapped_column(String(50))
+    color: Mapped[str | None] = mapped_column(String(7), nullable=True)  # hex color e.g. #ff6b6b
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+
+
+class ScheduleTagAssociation(Base):
+    """日程与标签的多对多关联表。"""
+    __tablename__ = "schedule_tag_associations"
+    __table_args__ = (UniqueConstraint("schedule_id", "tag_id"),)
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    schedule_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("schedules.id", ondelete="CASCADE"), index=True
+    )
+    tag_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("schedule_tags.id", ondelete="CASCADE"), index=True
+    )
+

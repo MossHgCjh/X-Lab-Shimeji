@@ -7,7 +7,7 @@ from services.core.app.config import get_settings
 from services.core.app.models import Base
 
 config = context.config
-sync_url = get_settings().database_url.replace("+asyncpg", "").replace("+aiosqlite", "")
+sync_url = get_settings().database_url.replace("+asyncpg", "+psycopg").replace("+aiosqlite", "")
 config.set_main_option("sqlalchemy.url", sync_url)
 if config.config_file_name:
     fileConfig(config.config_file_name)
