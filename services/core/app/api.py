@@ -49,7 +49,11 @@ router = APIRouter(prefix="/api/v1")
 
 # ──────────────── Built-in Media Assets ────────────────
 
-NOISE_DIR = Path(__file__).resolve().parent.parent / "assets" / "noise"
+NOISE_DIR = (
+    Path(__file__).resolve().parent.parent
+    / "assets"
+    / "noise"
+)
 
 NOISE_FILES = {
     "white": NOISE_DIR / "white.ogg",
@@ -60,34 +64,49 @@ NOISE_FILES = {
 
 
 def as_utc(value: datetime) -> datetime:
-    """Normalize DB datetimes to UTC.
-
-    SQLite used by tests may return naive datetimes even when the model
-    declares timezone=True, while PostgreSQL returns timezone-aware values.
-    """
     if value.tzinfo is None:
-        return value.replace(tzinfo=UTC)
+        return value.replace(
+            tzinfo=UTC,
+        )
+
     return value.astimezone(UTC)
 
 
-def focus_status(focus: FocusSession) -> FocusStatusOut:
-    """Convert a focus ORM record into the API status representation."""
+def focus_status(
+    focus: FocusSession,
+) -> FocusStatusOut:
     now = datetime.now(UTC)
 
-    started_at = as_utc(focus.started_at)
+    started_at = as_utc(
+        focus.started_at,
+    )
 
     if focus.finished_at is not None:
-        end = as_utc(focus.finished_at)
+        end = as_utc(
+            focus.finished_at,
+        )
     else:
         end = now
 
     elapsed = max(
         0,
-        int((end - started_at).total_seconds()),
+        int(
+            (
+                end
+                - started_at
+            ).total_seconds()
+        ),
     )
 
-    planned = focus.planned_minutes * 60
-    remaining = max(0, planned - elapsed)
+    planned = (
+        focus.planned_minutes
+        * 60
+    )
+
+    remaining = max(
+        0,
+        planned - elapsed,
+    )
 
     if focus.end_reason == "cancelled":
         current_status = "cancelled"
@@ -121,11 +140,18 @@ def focus_status(focus: FocusSession) -> FocusStatusOut:
 )
 async def register(
     body: RegisterRequest,
-    session: AsyncSession = Depends(get_session),
+    session: AsyncSession = Depends(
+        get_session,
+    ),
 ):
-    if await session.scalar(
-        select(User).where(User.email == body.email.lower())
-    ):
+    existing = await session.scalar(
+        select(User).where(
+            User.email
+            == body.email.lower(),
+        )
+    )
+
+    if existing:
         raise HTTPException(
             status.HTTP_409_CONFLICT,
             "Email already registered",
@@ -133,14 +159,18 @@ async def register(
 
     user = User(
         email=body.email.lower(),
-        password_hash=password_hash.hash(body.password),
+        password_hash=password_hash.hash(
+            body.password,
+        ),
     )
 
     session.add(user)
     await session.commit()
 
     return TokenResponse(
-        access_token=create_token(user.id),
+        access_token=create_token(
+            user.id,
+        ),
     )
 
 
@@ -150,15 +180,23 @@ async def register(
 )
 async def login(
     body: LoginRequest,
-    session: AsyncSession = Depends(get_session),
+    session: AsyncSession = Depends(
+        get_session,
+    ),
 ):
     user = await session.scalar(
-        select(User).where(User.email == body.email.lower())
+        select(User).where(
+            User.email
+            == body.email.lower(),
+        )
     )
 
-    if not user or not password_hash.verify(
-        body.password,
-        user.password_hash,
+    if (
+        not user
+        or not password_hash.verify(
+            body.password,
+            user.password_hash,
+        )
     ):
         raise HTTPException(
             status.HTTP_401_UNAUTHORIZED,
@@ -166,7 +204,9 @@ async def login(
         )
 
     return TokenResponse(
-        access_token=create_token(user.id),
+        access_token=create_token(
+            user.id,
+        ),
     )
 
 
@@ -178,13 +218,22 @@ async def login(
     response_model=list[EventOut],
 )
 async def list_events(
-    user: User = Depends(current_user),
-    session: AsyncSession = Depends(get_session),
+    user: User = Depends(
+        current_user,
+    ),
+    session: AsyncSession = Depends(
+        get_session,
+    ),
 ):
     result = await session.scalars(
         select(CalendarEvent)
-        .where(CalendarEvent.user_id == user.id)
-        .order_by(CalendarEvent.starts_at)
+        .where(
+            CalendarEvent.user_id
+            == user.id,
+        )
+        .order_by(
+            CalendarEvent.starts_at,
+        )
     )
 
     return list(result)
@@ -197,8 +246,12 @@ async def list_events(
 )
 async def create_event(
     body: EventCreate,
-    user: User = Depends(current_user),
-    session: AsyncSession = Depends(get_session),
+    user: User = Depends(
+        current_user,
+    ),
+    session: AsyncSession = Depends(
+        get_session,
+    ),
 ):
     event = CalendarEvent(
         user_id=user.id,
@@ -220,13 +273,22 @@ async def create_event(
     response_model=list[TaskOut],
 )
 async def list_tasks(
-    user: User = Depends(current_user),
-    session: AsyncSession = Depends(get_session),
+    user: User = Depends(
+        current_user,
+    ),
+    session: AsyncSession = Depends(
+        get_session,
+    ),
 ):
     result = await session.scalars(
         select(Task)
-        .where(Task.user_id == user.id)
-        .order_by(Task.due_at)
+        .where(
+            Task.user_id
+            == user.id,
+        )
+        .order_by(
+            Task.due_at,
+        )
     )
 
     return list(result)
@@ -239,8 +301,12 @@ async def list_tasks(
 )
 async def create_task(
     body: TaskCreate,
-    user: User = Depends(current_user),
-    session: AsyncSession = Depends(get_session),
+    user: User = Depends(
+        current_user,
+    ),
+    session: AsyncSession = Depends(
+        get_session,
+    ),
 ):
     task = Task(
         user_id=user.id,
@@ -264,13 +330,20 @@ async def create_task(
 )
 async def start_focus(
     body: FocusStart,
-    user: User = Depends(current_user),
-    session: AsyncSession = Depends(get_session),
+    user: User = Depends(
+        current_user,
+    ),
+    session: AsyncSession = Depends(
+        get_session,
+    ),
 ):
     active = await session.scalar(
         select(FocusSession).where(
-            FocusSession.user_id == user.id,
-            FocusSession.finished_at.is_(None),
+            FocusSession.user_id
+            == user.id,
+            FocusSession.finished_at.is_(
+                None,
+            ),
         )
     )
 
@@ -280,8 +353,25 @@ async def start_focus(
             "A focus session is already running",
         )
 
+    if body.schedule_id is not None:
+        schedule = await session.scalar(
+            select(Schedule).where(
+                Schedule.id
+                == body.schedule_id,
+                Schedule.user_id
+                == user.id,
+            )
+        )
+
+        if schedule is None:
+            raise HTTPException(
+                status.HTTP_404_NOT_FOUND,
+                "Schedule not found",
+            )
+
     focus = FocusSession(
         user_id=user.id,
+        schedule_id=body.schedule_id,
         planned_minutes=body.planned_minutes,
     )
 
@@ -292,26 +382,33 @@ async def start_focus(
     return focus_status(focus)
 
 
-# NOTE:
-# /focus/current and /focus/history must appear before /focus/{focus_id},
-# otherwise FastAPI may try to interpret "current" or "history" as UUIDs.
-
-
 @router.get(
     "/focus/current",
-    response_model=FocusStatusOut | None,
+    response_model=(
+        FocusStatusOut
+        | None
+    ),
 )
 async def current_focus(
-    user: User = Depends(current_user),
-    session: AsyncSession = Depends(get_session),
+    user: User = Depends(
+        current_user,
+    ),
+    session: AsyncSession = Depends(
+        get_session,
+    ),
 ):
     focus = await session.scalar(
         select(FocusSession)
         .where(
-            FocusSession.user_id == user.id,
-            FocusSession.finished_at.is_(None),
+            FocusSession.user_id
+            == user.id,
+            FocusSession.finished_at.is_(
+                None,
+            ),
         )
-        .order_by(FocusSession.started_at.desc())
+        .order_by(
+            FocusSession.started_at.desc(),
+        )
     )
 
     if focus is None:
@@ -330,15 +427,34 @@ async def focus_history(
         ge=1,
         le=100,
     ),
-    user: User = Depends(current_user),
-    session: AsyncSession = Depends(get_session),
+    schedule_id: uuid.UUID | None = Query(
+        default=None,
+    ),
+    user: User = Depends(
+        current_user,
+    ),
+    session: AsyncSession = Depends(
+        get_session,
+    ),
 ):
-    result = await session.scalars(
-        select(FocusSession)
-        .where(
-            FocusSession.user_id == user.id,
+    query = select(
+        FocusSession,
+    ).where(
+        FocusSession.user_id
+        == user.id,
+    )
+
+    if schedule_id is not None:
+        query = query.where(
+            FocusSession.schedule_id
+            == schedule_id,
         )
-        .order_by(FocusSession.started_at.desc())
+
+    result = await session.scalars(
+        query
+        .order_by(
+            FocusSession.started_at.desc(),
+        )
         .limit(limit)
     )
 
@@ -354,13 +470,19 @@ async def focus_history(
 )
 async def get_focus(
     focus_id: uuid.UUID,
-    user: User = Depends(current_user),
-    session: AsyncSession = Depends(get_session),
+    user: User = Depends(
+        current_user,
+    ),
+    session: AsyncSession = Depends(
+        get_session,
+    ),
 ):
     focus = await session.scalar(
         select(FocusSession).where(
-            FocusSession.id == focus_id,
-            FocusSession.user_id == user.id,
+            FocusSession.id
+            == focus_id,
+            FocusSession.user_id
+            == user.id,
         )
     )
 
@@ -379,13 +501,19 @@ async def get_focus(
 )
 async def finish_focus(
     focus_id: uuid.UUID,
-    user: User = Depends(current_user),
-    session: AsyncSession = Depends(get_session),
+    user: User = Depends(
+        current_user,
+    ),
+    session: AsyncSession = Depends(
+        get_session,
+    ),
 ):
     focus = await session.scalar(
         select(FocusSession).where(
-            FocusSession.id == focus_id,
-            FocusSession.user_id == user.id,
+            FocusSession.id
+            == focus_id,
+            FocusSession.user_id
+            == user.id,
         )
     )
 
@@ -396,29 +524,50 @@ async def finish_focus(
         )
 
     if focus.finished_at is not None:
-        if focus.end_reason == "cancelled":
+        if (
+            focus.end_reason
+            == "cancelled"
+        ):
             raise HTTPException(
                 status.HTTP_409_CONFLICT,
-                "Cancelled focus session cannot be finished",
+                (
+                    "Cancelled focus session "
+                    "cannot be finished"
+                ),
             )
 
         return focus_status(focus)
 
-    focus.finished_at = datetime.now(UTC)
+    focus.finished_at = datetime.now(
+        UTC,
+    )
     focus.end_reason = "completed"
 
     elapsed = (
         focus.finished_at
-        - as_utc(focus.started_at)
+        - as_utc(
+            focus.started_at,
+        )
     ).total_seconds()
 
-    if elapsed >= focus.planned_minutes * 60 * 0.8:
+    if (
+        elapsed
+        >= focus.planned_minutes
+        * 60
+        * 0.8
+    ):
         session.add(
             RewardLedger(
                 user_id=user.id,
-                amount=focus.planned_minutes,
-                reason="focus_completed",
-                reference_id=f"focus:{focus.id}",
+                amount=(
+                    focus.planned_minutes
+                ),
+                reason=(
+                    "focus_completed"
+                ),
+                reference_id=(
+                    f"focus:{focus.id}"
+                ),
             )
         )
 
@@ -434,13 +583,19 @@ async def finish_focus(
 )
 async def cancel_focus(
     focus_id: uuid.UUID,
-    user: User = Depends(current_user),
-    session: AsyncSession = Depends(get_session),
+    user: User = Depends(
+        current_user,
+    ),
+    session: AsyncSession = Depends(
+        get_session,
+    ),
 ):
     focus = await session.scalar(
         select(FocusSession).where(
-            FocusSession.id == focus_id,
-            FocusSession.user_id == user.id,
+            FocusSession.id
+            == focus_id,
+            FocusSession.user_id
+            == user.id,
         )
     )
 
@@ -451,15 +606,23 @@ async def cancel_focus(
         )
 
     if focus.finished_at is not None:
-        if focus.end_reason != "cancelled":
+        if (
+            focus.end_reason
+            != "cancelled"
+        ):
             raise HTTPException(
                 status.HTTP_409_CONFLICT,
-                "Completed focus session cannot be cancelled",
+                (
+                    "Completed focus session "
+                    "cannot be cancelled"
+                ),
             )
 
         return focus_status(focus)
 
-    focus.finished_at = datetime.now(UTC)
+    focus.finished_at = datetime.now(
+        UTC,
+    )
     focus.end_reason = "cancelled"
 
     await session.commit()
@@ -476,17 +639,24 @@ async def cancel_focus(
     response_model=BalanceOut,
 )
 async def reward_balance(
-    user: User = Depends(current_user),
-    session: AsyncSession = Depends(get_session),
+    user: User = Depends(
+        current_user,
+    ),
+    session: AsyncSession = Depends(
+        get_session,
+    ),
 ):
     balance = await session.scalar(
         select(
             func.coalesce(
-                func.sum(RewardLedger.amount),
+                func.sum(
+                    RewardLedger.amount,
+                ),
                 0,
             )
         ).where(
-            RewardLedger.user_id == user.id,
+            RewardLedger.user_id
+            == user.id,
         )
     )
 
@@ -500,16 +670,23 @@ async def reward_balance(
 
 @router.get(
     "/schedule-folders",
-    response_model=list[ScheduleFolderOut],
+    response_model=list[
+        ScheduleFolderOut
+    ],
 )
 async def list_folders(
-    user: User = Depends(current_user),
-    session: AsyncSession = Depends(get_session),
+    user: User = Depends(
+        current_user,
+    ),
+    session: AsyncSession = Depends(
+        get_session,
+    ),
 ):
     result = await session.scalars(
         select(ScheduleFolder)
         .where(
-            ScheduleFolder.user_id == user.id,
+            ScheduleFolder.user_id
+            == user.id,
         )
         .order_by(
             ScheduleFolder.created_at,
@@ -526,13 +703,19 @@ async def list_folders(
 )
 async def create_folder(
     body: ScheduleFolderCreate,
-    user: User = Depends(current_user),
-    session: AsyncSession = Depends(get_session),
+    user: User = Depends(
+        current_user,
+    ),
+    session: AsyncSession = Depends(
+        get_session,
+    ),
 ):
     existing = await session.scalar(
         select(ScheduleFolder).where(
-            ScheduleFolder.user_id == user.id,
-            ScheduleFolder.name == body.name,
+            ScheduleFolder.user_id
+            == user.id,
+            ScheduleFolder.name
+            == body.name,
         )
     )
 
@@ -561,13 +744,19 @@ async def create_folder(
 async def update_folder(
     folder_id: uuid.UUID,
     body: ScheduleFolderUpdate,
-    user: User = Depends(current_user),
-    session: AsyncSession = Depends(get_session),
+    user: User = Depends(
+        current_user,
+    ),
+    session: AsyncSession = Depends(
+        get_session,
+    ),
 ):
     folder = await session.scalar(
         select(ScheduleFolder).where(
-            ScheduleFolder.id == folder_id,
-            ScheduleFolder.user_id == user.id,
+            ScheduleFolder.id
+            == folder_id,
+            ScheduleFolder.user_id
+            == user.id,
         )
     )
 
@@ -579,9 +768,12 @@ async def update_folder(
 
     conflict = await session.scalar(
         select(ScheduleFolder).where(
-            ScheduleFolder.user_id == user.id,
-            ScheduleFolder.name == body.name,
-            ScheduleFolder.id != folder_id,
+            ScheduleFolder.user_id
+            == user.id,
+            ScheduleFolder.name
+            == body.name,
+            ScheduleFolder.id
+            != folder_id,
         )
     )
 
@@ -601,17 +793,25 @@ async def update_folder(
 
 @router.delete(
     "/schedule-folders/{folder_id}",
-    status_code=status.HTTP_204_NO_CONTENT,
+    status_code=(
+        status.HTTP_204_NO_CONTENT
+    ),
 )
 async def delete_folder(
     folder_id: uuid.UUID,
-    user: User = Depends(current_user),
-    session: AsyncSession = Depends(get_session),
+    user: User = Depends(
+        current_user,
+    ),
+    session: AsyncSession = Depends(
+        get_session,
+    ),
 ):
     folder = await session.scalar(
         select(ScheduleFolder).where(
-            ScheduleFolder.id == folder_id,
-            ScheduleFolder.user_id == user.id,
+            ScheduleFolder.id
+            == folder_id,
+            ScheduleFolder.user_id
+            == user.id,
         )
     )
 
@@ -621,11 +821,11 @@ async def delete_folder(
             "Folder not found",
         )
 
-    # 将属于该文件夹的日程设为无文件夹。
     schedules = (
         await session.scalars(
             select(Schedule).where(
-                Schedule.folder_id == folder_id,
+                Schedule.folder_id
+                == folder_id,
             )
         )
     ).all()
@@ -644,16 +844,23 @@ async def delete_folder(
 
 @router.get(
     "/schedule-tags",
-    response_model=list[ScheduleTagOut],
+    response_model=list[
+        ScheduleTagOut
+    ],
 )
 async def list_tags(
-    user: User = Depends(current_user),
-    session: AsyncSession = Depends(get_session),
+    user: User = Depends(
+        current_user,
+    ),
+    session: AsyncSession = Depends(
+        get_session,
+    ),
 ):
     result = await session.scalars(
         select(ScheduleTag)
         .where(
-            ScheduleTag.user_id == user.id,
+            ScheduleTag.user_id
+            == user.id,
         )
         .order_by(
             ScheduleTag.created_at,
@@ -670,13 +877,19 @@ async def list_tags(
 )
 async def create_tag(
     body: ScheduleTagCreate,
-    user: User = Depends(current_user),
-    session: AsyncSession = Depends(get_session),
+    user: User = Depends(
+        current_user,
+    ),
+    session: AsyncSession = Depends(
+        get_session,
+    ),
 ):
     existing = await session.scalar(
         select(ScheduleTag).where(
-            ScheduleTag.user_id == user.id,
-            ScheduleTag.name == body.name,
+            ScheduleTag.user_id
+            == user.id,
+            ScheduleTag.name
+            == body.name,
         )
     )
 
@@ -706,13 +919,19 @@ async def create_tag(
 async def update_tag(
     tag_id: uuid.UUID,
     body: ScheduleTagUpdate,
-    user: User = Depends(current_user),
-    session: AsyncSession = Depends(get_session),
+    user: User = Depends(
+        current_user,
+    ),
+    session: AsyncSession = Depends(
+        get_session,
+    ),
 ):
     tag = await session.scalar(
         select(ScheduleTag).where(
-            ScheduleTag.id == tag_id,
-            ScheduleTag.user_id == user.id,
+            ScheduleTag.id
+            == tag_id,
+            ScheduleTag.user_id
+            == user.id,
         )
     )
 
@@ -725,9 +944,12 @@ async def update_tag(
     if body.name is not None:
         conflict = await session.scalar(
             select(ScheduleTag).where(
-                ScheduleTag.user_id == user.id,
-                ScheduleTag.name == body.name,
-                ScheduleTag.id != tag_id,
+                ScheduleTag.user_id
+                == user.id,
+                ScheduleTag.name
+                == body.name,
+                ScheduleTag.id
+                != tag_id,
             )
         )
 
@@ -750,17 +972,25 @@ async def update_tag(
 
 @router.delete(
     "/schedule-tags/{tag_id}",
-    status_code=status.HTTP_204_NO_CONTENT,
+    status_code=(
+        status.HTTP_204_NO_CONTENT
+    ),
 )
 async def delete_tag(
     tag_id: uuid.UUID,
-    user: User = Depends(current_user),
-    session: AsyncSession = Depends(get_session),
+    user: User = Depends(
+        current_user,
+    ),
+    session: AsyncSession = Depends(
+        get_session,
+    ),
 ):
     tag = await session.scalar(
         select(ScheduleTag).where(
-            ScheduleTag.id == tag_id,
-            ScheduleTag.user_id == user.id,
+            ScheduleTag.id
+            == tag_id,
+            ScheduleTag.user_id
+            == user.id,
         )
     )
 
@@ -783,31 +1013,44 @@ async def _schedule_to_out(
     schedule: Schedule,
     session: AsyncSession,
 ) -> ScheduleOut:
-    """将 Schedule ORM 对象转为 ScheduleOut，包含关联的 tags。"""
     assoc_result = await session.scalars(
-        select(ScheduleTagAssociation).where(
-            ScheduleTagAssociation.schedule_id == schedule.id,
+        select(
+            ScheduleTagAssociation,
+        ).where(
+            ScheduleTagAssociation.schedule_id
+            == schedule.id,
         )
     )
 
-    assocs = list(assoc_result)
+    assocs = list(
+        assoc_result,
+    )
+
     tag_ids = [
         association.tag_id
-        for association in assocs
+        for association
+        in assocs
     ]
 
-    tags: list[ScheduleTagOut] = []
+    tags: list[
+        ScheduleTagOut
+    ] = []
 
     if tag_ids:
         tag_result = await session.scalars(
             select(ScheduleTag).where(
-                ScheduleTag.id.in_(tag_ids),
+                ScheduleTag.id.in_(
+                    tag_ids,
+                )
             )
         )
 
         tags = [
-            ScheduleTagOut.model_validate(tag)
-            for tag in tag_result
+            ScheduleTagOut.model_validate(
+                tag,
+            )
+            for tag
+            in tag_result
         ]
 
     return ScheduleOut(
@@ -817,7 +1060,9 @@ async def _schedule_to_out(
         description=schedule.description,
         starts_at=schedule.starts_at,
         ends_at=schedule.ends_at,
-        is_completed=schedule.is_completed,
+        is_completed=(
+            schedule.is_completed
+        ),
         tags=tags,
         created_at=schedule.created_at,
     )
@@ -828,24 +1073,27 @@ async def _set_schedule_tags(
     tag_ids: list[uuid.UUID],
     session: AsyncSession,
 ) -> None:
-    """设置日程的标签（先删后建）。"""
     existing = (
         await session.scalars(
-            select(ScheduleTagAssociation).where(
-                ScheduleTagAssociation.schedule_id == schedule_id,
+            select(
+                ScheduleTagAssociation,
+            ).where(
+                ScheduleTagAssociation.schedule_id
+                == schedule_id,
             )
         )
     ).all()
 
     for association in existing:
-        await session.delete(association)
+        await session.delete(
+            association,
+        )
 
-    # 先执行删除，避免与后续插入的新关联发生
-    # (schedule_id, tag_id) 唯一约束冲突。
     await session.flush()
 
-    # 去重，防止传入重复 tag_id 导致唯一约束冲突。
-    for tag_id in dict.fromkeys(tag_ids):
+    for tag_id in dict.fromkeys(
+        tag_ids,
+    ):
         session.add(
             ScheduleTagAssociation(
                 schedule_id=schedule_id,
@@ -859,7 +1107,9 @@ async def _set_schedule_tags(
 
 @router.get(
     "/schedules",
-    response_model=list[ScheduleOut],
+    response_model=list[
+        ScheduleOut
+    ],
 )
 async def list_schedules(
     folder_id: uuid.UUID | None = Query(
@@ -882,31 +1132,42 @@ async def list_schedules(
         None,
         description="按完成状态筛选",
     ),
-    user: User = Depends(current_user),
-    session: AsyncSession = Depends(get_session),
+    user: User = Depends(
+        current_user,
+    ),
+    session: AsyncSession = Depends(
+        get_session,
+    ),
 ):
-    query = select(Schedule).where(
-        Schedule.user_id == user.id,
+    query = select(
+        Schedule,
+    ).where(
+        Schedule.user_id
+        == user.id,
     )
 
     if folder_id is not None:
         query = query.where(
-            Schedule.folder_id == folder_id,
+            Schedule.folder_id
+            == folder_id,
         )
 
     if start_date is not None:
         query = query.where(
-            Schedule.starts_at >= start_date,
+            Schedule.starts_at
+            >= start_date,
         )
 
     if end_date is not None:
         query = query.where(
-            Schedule.ends_at <= end_date,
+            Schedule.ends_at
+            <= end_date,
         )
 
     if is_completed is not None:
         query = query.where(
-            Schedule.is_completed == is_completed,
+            Schedule.is_completed
+            == is_completed,
         )
 
     if tag_id is not None:
@@ -915,7 +1176,8 @@ async def list_schedules(
                 select(
                     ScheduleTagAssociation.schedule_id,
                 ).where(
-                    ScheduleTagAssociation.tag_id == tag_id,
+                    ScheduleTagAssociation.tag_id
+                    == tag_id,
                 )
             )
         )
@@ -924,17 +1186,22 @@ async def list_schedules(
         Schedule.starts_at,
     )
 
-    result = await session.scalars(query)
-    schedules = list(result)
+    result = await session.scalars(
+        query,
+    )
+
+    schedules = list(
+        result,
+    )
 
     return [
-        await _schedule_to_out(schedule, session)
-        for schedule in schedules
+        await _schedule_to_out(
+            schedule,
+            session,
+        )
+        for schedule
+        in schedules
     ]
-
-
-# IMPORTANT:
-# /schedules/stats must appear before /schedules/{schedule_id}.
 
 
 @router.get(
@@ -944,20 +1211,29 @@ async def list_schedules(
 async def schedule_stats(
     period: str = Query(
         "month",
-        pattern=r"^(day|week|month|year)$",
+        pattern=(
+            r"^(day|week|month|year)$"
+        ),
     ),
     date: str | None = Query(
         None,
-        description="基准日期 ISO 格式，默认今天",
+        description=(
+            "基准日期 ISO 格式，默认今天"
+        ),
     ),
-    user: User = Depends(current_user),
-    session: AsyncSession = Depends(get_session),
+    user: User = Depends(
+        current_user,
+    ),
+    session: AsyncSession = Depends(
+        get_session,
+    ),
 ):
-    """按天/周/月/年统计已完成日程数量和标签分布。"""
     base_date = (
         datetime.now(UTC)
         if date is None
-        else datetime.fromisoformat(date)
+        else datetime.fromisoformat(
+            date,
+        )
     )
 
     if period == "day":
@@ -967,18 +1243,30 @@ async def schedule_stats(
             second=0,
             microsecond=0,
         )
-        end = start + timedelta(days=1)
+        end = (
+            start
+            + timedelta(days=1)
+        )
 
     elif period == "week":
-        start = base_date.replace(
-            hour=0,
-            minute=0,
-            second=0,
-            microsecond=0,
-        ) - timedelta(
-            days=base_date.weekday(),
+        start = (
+            base_date.replace(
+                hour=0,
+                minute=0,
+                second=0,
+                microsecond=0,
+            )
+            - timedelta(
+                days=(
+                    base_date.weekday()
+                ),
+            )
         )
-        end = start + timedelta(days=7)
+
+        end = (
+            start
+            + timedelta(days=7)
+        )
 
     elif period == "month":
         start = base_date.replace(
@@ -991,7 +1279,10 @@ async def schedule_stats(
 
         if base_date.month == 12:
             end = base_date.replace(
-                year=base_date.year + 1,
+                year=(
+                    base_date.year
+                    + 1
+                ),
                 month=1,
                 day=1,
                 hour=0,
@@ -1001,7 +1292,10 @@ async def schedule_stats(
             )
         else:
             end = base_date.replace(
-                month=base_date.month + 1,
+                month=(
+                    base_date.month
+                    + 1
+                ),
                 day=1,
                 hour=0,
                 minute=0,
@@ -1018,8 +1312,12 @@ async def schedule_stats(
             second=0,
             microsecond=0,
         )
+
         end = base_date.replace(
-            year=base_date.year + 1,
+            year=(
+                base_date.year
+                + 1
+            ),
             month=1,
             day=1,
             hour=0,
@@ -1031,24 +1329,38 @@ async def schedule_stats(
     schedules = (
         await session.scalars(
             select(Schedule).where(
-                Schedule.user_id == user.id,
-                Schedule.is_completed.is_(True),
-                Schedule.starts_at >= start,
-                Schedule.starts_at < end,
+                Schedule.user_id
+                == user.id,
+                Schedule.is_completed.is_(
+                    True,
+                ),
+                Schedule.starts_at
+                >= start,
+                Schedule.starts_at
+                < end,
             )
         )
     ).all()
 
-    total_completed = len(schedules)
+    total_completed = len(
+        schedules,
+    )
 
-    tag_count_map: dict[str, dict] = {}
+    tag_count_map: dict[
+        str,
+        dict,
+    ] = {}
+
     untagged_count = 0
 
     for schedule in schedules:
         associations = (
             await session.scalars(
-                select(ScheduleTagAssociation).where(
-                    ScheduleTagAssociation.schedule_id == schedule.id,
+                select(
+                    ScheduleTagAssociation,
+                ).where(
+                    ScheduleTagAssociation.schedule_id
+                    == schedule.id,
                 )
             )
         ).all()
@@ -1059,39 +1371,65 @@ async def schedule_stats(
 
         tag_ids = [
             association.tag_id
-            for association in associations
+            for association
+            in associations
         ]
 
         tags = (
             await session.scalars(
-                select(ScheduleTag).where(
-                    ScheduleTag.id.in_(tag_ids),
+                select(
+                    ScheduleTag,
+                ).where(
+                    ScheduleTag.id.in_(
+                        tag_ids,
+                    )
                 )
             )
         ).all()
 
         for tag in tags:
-            key = str(tag.id)
+            key = str(
+                tag.id,
+            )
 
-            if key not in tag_count_map:
+            if (
+                key
+                not in tag_count_map
+            ):
                 tag_count_map[key] = {
                     "tag_id": tag.id,
                     "tag_name": tag.name,
-                    "tag_color": tag.color,
+                    "tag_color": (
+                        tag.color
+                    ),
                     "count": 0,
                 }
 
-            tag_count_map[key]["count"] += 1
+            tag_count_map[
+                key
+            ]["count"] += 1
 
-    tag_counts: list[TagCountItem] = []
+    tag_counts: list[
+        TagCountItem
+    ] = []
 
-    for item in tag_count_map.values():
+    for item in (
+        tag_count_map.values()
+    ):
         tag_counts.append(
             TagCountItem(
-                tag_id=item["tag_id"],
-                tag_name=item["tag_name"],
-                tag_color=item["tag_color"],
-                count=item["count"],
+                tag_id=(
+                    item["tag_id"]
+                ),
+                tag_name=(
+                    item["tag_name"]
+                ),
+                tag_color=(
+                    item["tag_color"]
+                ),
+                count=(
+                    item["count"]
+                ),
             )
         )
 
@@ -1101,13 +1439,17 @@ async def schedule_stats(
                 tag_id=None,
                 tag_name="未分类",
                 tag_color=None,
-                count=untagged_count,
+                count=(
+                    untagged_count
+                ),
             )
         )
 
     return ScheduleStatsOut(
         period=period,
-        total_completed=total_completed,
+        total_completed=(
+            total_completed
+        ),
         tag_counts=tag_counts,
     )
 
@@ -1118,13 +1460,19 @@ async def schedule_stats(
 )
 async def get_schedule(
     schedule_id: uuid.UUID,
-    user: User = Depends(current_user),
-    session: AsyncSession = Depends(get_session),
+    user: User = Depends(
+        current_user,
+    ),
+    session: AsyncSession = Depends(
+        get_session,
+    ),
 ):
     schedule = await session.scalar(
         select(Schedule).where(
-            Schedule.id == schedule_id,
-            Schedule.user_id == user.id,
+            Schedule.id
+            == schedule_id,
+            Schedule.user_id
+            == user.id,
         )
     )
 
@@ -1147,14 +1495,20 @@ async def get_schedule(
 )
 async def create_schedule(
     body: ScheduleCreate,
-    user: User = Depends(current_user),
-    session: AsyncSession = Depends(get_session),
+    user: User = Depends(
+        current_user,
+    ),
+    session: AsyncSession = Depends(
+        get_session,
+    ),
 ):
-    if body.folder_id:
+    if body.folder_id is not None:
         folder = await session.scalar(
             select(ScheduleFolder).where(
-                ScheduleFolder.id == body.folder_id,
-                ScheduleFolder.user_id == user.id,
+                ScheduleFolder.id
+                == body.folder_id,
+                ScheduleFolder.user_id
+                == user.id,
             )
         )
 
@@ -1177,7 +1531,6 @@ async def create_schedule(
 
     session.add(schedule)
 
-    # Flush first so schedule.id exists before creating tag associations.
     await session.flush()
 
     await _set_schedule_tags(
@@ -1202,13 +1555,19 @@ async def create_schedule(
 async def update_schedule(
     schedule_id: uuid.UUID,
     body: ScheduleUpdate,
-    user: User = Depends(current_user),
-    session: AsyncSession = Depends(get_session),
+    user: User = Depends(
+        current_user,
+    ),
+    session: AsyncSession = Depends(
+        get_session,
+    ),
 ):
     schedule = await session.scalar(
         select(Schedule).where(
-            Schedule.id == schedule_id,
-            Schedule.user_id == user.id,
+            Schedule.id
+            == schedule_id,
+            Schedule.user_id
+            == user.id,
         )
     )
 
@@ -1218,22 +1577,30 @@ async def update_schedule(
             "Schedule not found",
         )
 
-    if body.folder_id is not None:
-        if body.folder_id != schedule.folder_id:
-            folder = await session.scalar(
-                select(ScheduleFolder).where(
-                    ScheduleFolder.id == body.folder_id,
-                    ScheduleFolder.user_id == user.id,
-                )
+    if (
+        body.folder_id
+        is not None
+        and body.folder_id
+        != schedule.folder_id
+    ):
+        folder = await session.scalar(
+            select(ScheduleFolder).where(
+                ScheduleFolder.id
+                == body.folder_id,
+                ScheduleFolder.user_id
+                == user.id,
+            )
+        )
+
+        if not folder:
+            raise HTTPException(
+                status.HTTP_404_NOT_FOUND,
+                "Folder not found",
             )
 
-            if not folder:
-                raise HTTPException(
-                    status.HTTP_404_NOT_FOUND,
-                    "Folder not found",
-                )
-
-            schedule.folder_id = body.folder_id
+        schedule.folder_id = (
+            body.folder_id
+        )
 
     update_fields = (
         "title",
@@ -1257,10 +1624,16 @@ async def update_schedule(
                 value,
             )
 
-    if schedule.ends_at <= schedule.starts_at:
+    if (
+        schedule.ends_at
+        <= schedule.starts_at
+    ):
         raise HTTPException(
             status.HTTP_400_BAD_REQUEST,
-            "ends_at must be after starts_at",
+            (
+                "ends_at must be "
+                "after starts_at"
+            ),
         )
 
     if body.tag_ids is not None:
@@ -1281,17 +1654,25 @@ async def update_schedule(
 
 @router.delete(
     "/schedules/{schedule_id}",
-    status_code=status.HTTP_204_NO_CONTENT,
+    status_code=(
+        status.HTTP_204_NO_CONTENT
+    ),
 )
 async def delete_schedule(
     schedule_id: uuid.UUID,
-    user: User = Depends(current_user),
-    session: AsyncSession = Depends(get_session),
+    user: User = Depends(
+        current_user,
+    ),
+    session: AsyncSession = Depends(
+        get_session,
+    ),
 ):
     schedule = await session.scalar(
         select(Schedule).where(
-            Schedule.id == schedule_id,
-            Schedule.user_id == user.id,
+            Schedule.id
+            == schedule_id,
+            Schedule.user_id
+            == user.id,
         )
     )
 
@@ -1301,7 +1682,25 @@ async def delete_schedule(
             "Schedule not found",
         )
 
-    await session.delete(schedule)
+    linked_focus_sessions = (
+        await session.scalars(
+            select(
+                FocusSession,
+            ).where(
+                FocusSession.schedule_id
+                == schedule_id,
+            )
+        )
+    ).all()
+
+    for focus in (
+        linked_focus_sessions
+    ):
+        focus.schedule_id = None
+
+    await session.delete(
+        schedule,
+    )
     await session.commit()
 
     return None
@@ -1310,28 +1709,46 @@ async def delete_schedule(
 # ──────────────── Media APIs ────────────────
 
 
-@router.get("/media/tracks")
+@router.get(
+    "/media/tracks",
+)
 async def media_tracks(
-    _: User = Depends(current_user),
+    _: User = Depends(
+        current_user,
+    ),
 ):
     return {
         "items": [
             {
-                "id": "white-noise",
-                "title": "White Noise",
+                "id": (
+                    "white-noise"
+                ),
+                "title": (
+                    "White Noise"
+                ),
                 "kind": "builtin",
-                "url": "/api/v1/media/noise/white",
+                "url": (
+                    "/api/v1/"
+                    "media/noise/"
+                    "white"
+                ),
             }
         ]
     }
 
 
-@router.get("/media/noise/{kind}")
+@router.get(
+    "/media/noise/{kind}",
+)
 async def get_noise(
     kind: str,
-    _: User = Depends(current_user),
+    _: User = Depends(
+        current_user,
+    ),
 ):
-    path = NOISE_FILES.get(kind)
+    path = NOISE_FILES.get(
+        kind,
+    )
 
     if path is None:
         raise HTTPException(
@@ -1341,7 +1758,10 @@ async def get_noise(
 
     if not path.is_file():
         raise HTTPException(
-            status.HTTP_500_INTERNAL_SERVER_ERROR,
+            (
+                status
+                .HTTP_500_INTERNAL_SERVER_ERROR
+            ),
             "Noise asset is missing",
         )
 
