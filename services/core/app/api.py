@@ -100,6 +100,7 @@ def focus_status(focus: FocusSession) -> FocusStatusOut:
 
     return FocusStatusOut(
         id=focus.id,
+        schedule_id=focus.schedule_id,
         planned_minutes=focus.planned_minutes,
         started_at=focus.started_at,
         finished_at=focus.finished_at,
