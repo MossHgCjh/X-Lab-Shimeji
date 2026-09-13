@@ -13,6 +13,10 @@ dist/
 .AppleDouble
 .LSOverride
 
+# Local test database
+/test.db
+/test.db-*
+
 # 个人工作文档，不提交
 docs/schedule-module.md
 docs/schedule-api-handoff.md

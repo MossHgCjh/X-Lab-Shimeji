@@ -65,6 +65,20 @@ class FocusOut(ORMModel):
     planned_minutes: int
     started_at: datetime
     finished_at: datetime | None
+    end_reason: str | None
+
+
+class FocusStatusOut(FocusOut):
+    status: str
+    elapsed_seconds: int
+    remaining_seconds: int
+
+
+class NoiseTrackOut(BaseModel):
+    id: str
+    title: str
+    kind: str
+    url: str
 
 
 class BalanceOut(BaseModel):

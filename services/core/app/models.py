@@ -66,6 +66,7 @@ class FocusSession(Base):
     planned_minutes: Mapped[int] = mapped_column(Integer)
     started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    end_reason: Mapped[str | None] = mapped_column(String(20))
 
 
 class RewardLedger(Base):
